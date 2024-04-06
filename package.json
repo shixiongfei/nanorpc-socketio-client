@@ -1,0 +1,40 @@
+{
+  "name": "nanorpc-socketio-client",
+  "version": "0.1.0",
+  "description": "An RPC library (client) based on socket.io-client.",
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "files": [
+    "lib/",
+    "src/"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "test": "tsc && node ./lib/index.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shixiongfei/nanorpc-socketio-client.git"
+  },
+  "keywords": [
+    "rpc",
+    "socket.io",
+    "socket.io-rpc",
+    "nanorpc"
+  ],
+  "author": "shixiongfei",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/shixiongfei/nanorpc-socketio-client/issues"
+  },
+  "homepage": "https://github.com/shixiongfei/nanorpc-socketio-client#readme",
+  "devDependencies": {
+    "@types/node": "^20.12.2",
+    "@typescript-eslint/eslint-plugin": "^7.5.0",
+    "@typescript-eslint/parser": "^7.5.0",
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.5",
+    "typescript": "^5.4.3"
+  }
+}
