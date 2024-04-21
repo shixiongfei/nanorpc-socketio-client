@@ -20,6 +20,7 @@ import {
 import { NanoRPCCode, NanoRPCServer } from "./server.js";
 
 export type NanoClientOptions = Readonly<{
+  secret?: string;
   queued?: boolean;
   timeout?: number;
   auth?: object | ((cb: (data: object) => void) => void);
@@ -31,12 +32,12 @@ export class NanoRPCClient {
   private readonly socket: ReturnType<typeof io>;
   private readonly server: NanoRPCServer;
 
-  constructor(url: string | URL, secret: string, options?: NanoClientOptions) {
+  constructor(url: string | URL, options?: NanoClientOptions) {
     this.validators = createNanoValidator();
     this.timeout = options?.timeout ?? 0;
     this.socket = io(typeof url === "string" ? url : url.href, {
       auth: options?.auth,
-      parser: createParser(secret),
+      parser: options?.secret ? createParser(options.secret) : undefined,
       transports: ["websocket"],
     });
     this.server = new NanoRPCServer(this.socket, options);
@@ -130,6 +131,5 @@ export class NanoRPCClient {
 
 export const createNanoRPCClient = (
   url: string | URL,
-  secret: string,
   options?: NanoClientOptions,
-) => new NanoRPCClient(url, secret, options);
+) => new NanoRPCClient(url, options);
