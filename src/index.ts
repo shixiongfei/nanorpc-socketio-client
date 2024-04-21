@@ -63,7 +63,7 @@ export class NanoRPCClient {
   }
 
   close() {
-    this.socket.close();
+    this.socket.disconnect();
     return this;
   }
 
