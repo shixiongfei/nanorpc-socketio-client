@@ -17,58 +17,102 @@ import {
   createNanoRPC,
   createNanoValidator,
 } from "nanorpc-validator";
-
-enum NanoRPCCode {
-  OK = 0,
-  ProtocolError,
-  MissingMethod,
-  ParameterError,
-  Exception,
-}
+import { NanoRPCCode, NanoRPCServer } from "./server.js";
 
 export type NanoClientOptions = Readonly<{
+  queued?: boolean;
+  timeout?: number;
   auth?: object | ((cb: (data: object) => void) => void);
 }>;
 
 export class NanoRPCClient {
   public readonly validators: NanoValidator;
+  private readonly timeout: number;
   private readonly socket: ReturnType<typeof io>;
+  private readonly server: NanoRPCServer;
 
   constructor(url: string | URL, secret: string, options?: NanoClientOptions) {
     this.validators = createNanoValidator();
+    this.timeout = options?.timeout ?? 0;
     this.socket = io(typeof url === "string" ? url : url.href, {
       auth: options?.auth,
       parser: createParser(secret),
       transports: ["websocket"],
     });
+    this.server = new NanoRPCServer(this.socket, options);
+  }
 
-    this.socket.on("connect_error", (error) => {
-      throw new Error(error.message);
-    });
+  get methods() {
+    return this.server;
+  }
+
+  get id() {
+    return this.socket.id;
+  }
+
+  get active() {
+    return this.socket.active;
+  }
+
+  get connected() {
+    return this.socket.connected;
+  }
+
+  get disconnected() {
+    return this.socket.disconnected;
+  }
+
+  close() {
+    this.socket.close();
+    return this;
   }
 
   apply<T, M extends string, P extends Array<unknown>>(method: M, args: P) {
     const rpc = createNanoRPC(method, args);
 
+    const doReplyFunc = async (reply: NanoReply<T>) => {
+      const validator = this.validators.getValidator(method);
+
+      if (validator && !validator(reply)) {
+        const lines = validator.errors!.map(
+          (err) => `${err.keyword}: ${err.instancePath}, ${err.message}`,
+        );
+        const error = lines.join("\n");
+
+        throw new Error(`NanoRPC call ${method}, ${error}`);
+      }
+
+      if (reply.code !== NanoRPCCode.OK) {
+        throw new Error(`NanoRPC call ${method} ${reply.message}`);
+      }
+
+      return reply.value;
+    };
+
     return new Promise<T | undefined>((resolve, reject) => {
-      this.socket.emit("/nanorpcs", rpc, (reply: NanoReply<T>) => {
-        const validator = this.validators.getValidator(method);
-
-        if (validator && !validator(reply)) {
-          const lines = validator.errors!.map(
-            (err) => `${err.keyword}: ${err.instancePath}, ${err.message}`,
-          );
-          const error = lines.join("\n");
-
-          return reject(new Error(`NanoRPC call ${method}, ${error}`));
-        }
-
-        if (reply.code !== NanoRPCCode.OK) {
-          return reject(new Error(`NanoRPC call ${method} ${reply.message}`));
-        }
-
-        return resolve(reply.value);
-      });
+      if (this.timeout > 0) {
+        this.socket
+          .timeout(this.timeout)
+          .emit("/nanorpcs", rpc, (error: Error, reply: NanoReply<T>) => {
+            if (error) {
+              reject(error);
+            } else {
+              try {
+                resolve(doReplyFunc(reply));
+              } catch (error) {
+                reject(error);
+              }
+            }
+          });
+      } else {
+        this.socket.emit("/nanorpcs", rpc, (reply: NanoReply<T>) => {
+          try {
+            resolve(doReplyFunc(reply));
+          } catch (error) {
+            reject(error);
+          }
+        });
+      }
     });
   }
 

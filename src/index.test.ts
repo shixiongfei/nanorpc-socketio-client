@@ -19,9 +19,13 @@ const test = async () => {
     "52440ec2-2a22-4544-93a7-161dfc47239a",
   );
 
+  rpc.methods.on("sub", (a: number, b: number) => a - b);
+
   const addRPC: AddRPCFunc = rpc.invoke("add");
 
   console.log(await Promise.all([addRPC(23, 31), rpc.call("add", 123, 456)]));
+
+  rpc.close();
 };
 
 test();
