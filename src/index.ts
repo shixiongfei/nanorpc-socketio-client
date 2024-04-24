@@ -71,7 +71,7 @@ export class NanoRPCClient {
   apply<T, M extends string, P extends Array<unknown>>(method: M, args: P) {
     const rpc = createNanoRPC(method, args);
 
-    const doReplyFunc = async (reply: NanoReply<T>) => {
+    const parseReply = (reply: NanoReply<T>) => {
       const validator = this.validators.getValidator(method);
 
       if (validator && !validator(reply)) {
@@ -99,7 +99,7 @@ export class NanoRPCClient {
               reject(error);
             } else {
               try {
-                resolve(doReplyFunc(reply));
+                resolve(parseReply(reply));
               } catch (error) {
                 reject(error);
               }
@@ -108,7 +108,7 @@ export class NanoRPCClient {
       } else {
         this.socket.emit("/nanorpcs", rpc, (reply: NanoReply<T>) => {
           try {
-            resolve(doReplyFunc(reply));
+            resolve(parseReply(reply));
           } catch (error) {
             reject(error);
           }
