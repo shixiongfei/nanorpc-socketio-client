@@ -20,6 +20,10 @@ const test = async () => {
 
   rpc.methods.on("ping", (timestamp: number) => timestamp);
 
+  rpc.message.on("test-event", (msg) => {
+    console.log("Event:", msg);
+  });
+
   const unsubscribe = await rpc.subscribe("test-channel", (msg) => {
     console.log("Subscribed:", msg);
   });

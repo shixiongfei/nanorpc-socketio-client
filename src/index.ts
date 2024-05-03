@@ -18,6 +18,7 @@ import {
   createNanoValidator,
 } from "nanorpc-validator";
 import { NanoRPCCode, NanoRPCServer } from "./server.js";
+import { NanoRPCMessage } from "./message.js";
 
 export type NanoClientOptions = Readonly<{
   secret?: string;
@@ -28,6 +29,7 @@ export type NanoClientOptions = Readonly<{
 
 export class NanoRPCClient {
   public readonly validators: NanoValidator;
+  public readonly message: NanoRPCMessage;
   private readonly timeout: number;
   private readonly socket: ReturnType<typeof io>;
   private readonly server: NanoRPCServer;
@@ -40,6 +42,7 @@ export class NanoRPCClient {
       parser: options?.secret ? createParser(options.secret) : undefined,
       transports: ["websocket"],
     });
+    this.message = new NanoRPCMessage(this.socket);
     this.server = new NanoRPCServer(this.socket, options);
   }
 
