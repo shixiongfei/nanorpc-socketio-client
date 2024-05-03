@@ -34,14 +34,36 @@ const isPromise = <T>(value: any): value is Promise<T> =>
 export class NanoRPCServer {
   public readonly validators: NanoValidator;
   private readonly methods: { [method: string]: boolean };
+  private readonly subscribes: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    [channel: string]: ((...args: any[]) => void)[];
+  };
   private readonly mutex: Mutex | undefined;
   private readonly socket: ReturnType<typeof io>;
 
   constructor(socket: ReturnType<typeof io>, options?: NanoClientOptions) {
     this.validators = createNanoValidator();
     this.methods = {};
+    this.subscribes = {};
     this.mutex = options?.queued ? new Mutex() : undefined;
     this.socket = socket;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.socket.on("/publish", (channels: string[], ...args: any[]) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const listeners: ((...args: any[]) => void)[] = [];
+
+      channels.forEach((channel) => {
+        if (channel in this.subscribes) {
+          this.subscribes[channel].forEach((listener) => {
+            if (listeners.indexOf(listener) < 0) {
+              listeners.push(listener);
+              listener(...args);
+            }
+          });
+        }
+      });
+    });
   }
 
   on<T, M extends string, P extends Array<unknown>>(
@@ -122,5 +144,33 @@ export class NanoRPCServer {
 
     this.methods[method] = true;
     return this;
+  }
+
+  subscribed<P extends Array<unknown>>(
+    channels: string[],
+    listener: (...args: P) => void,
+  ) {
+    channels.forEach((channel) => {
+      if (channel in this.subscribes) {
+        if (this.subscribes[channel].indexOf(listener) < 0) {
+          this.subscribes[channel].push(listener);
+        }
+      } else {
+        this.subscribes[channel] = [listener];
+      }
+    });
+  }
+
+  unsubscribed<P extends Array<unknown>>(
+    channels: string[],
+    listener: (...args: P) => void,
+  ) {
+    channels.forEach((channel) => {
+      if (channel in this.subscribes) {
+        this.subscribes[channel] = this.subscribes[channel].filter(
+          (subscriber) => subscriber !== listener,
+        );
+      }
+    });
   }
 }

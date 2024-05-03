@@ -20,9 +20,16 @@ const test = async () => {
 
   rpc.methods.on("ping", (timestamp: number) => timestamp);
 
+  const unsubscribe = await rpc.subscribe("test-channel", (msg) => {
+    console.log("Subscribed:", msg);
+  });
+
+  await rpc.call("publish");
+
   const addRPC: AddRPCFunc = rpc.invoke("add");
 
   console.log(await Promise.all([addRPC(23, 31), rpc.call("add", 123, 456)]));
+  console.log("Unsubscribed:", await unsubscribe());
 
   rpc.close();
 };

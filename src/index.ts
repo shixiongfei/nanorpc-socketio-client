@@ -68,6 +68,57 @@ export class NanoRPCClient {
     return this;
   }
 
+  subscribe<P extends Array<unknown>>(
+    channels: string | string[],
+    listener: (...args: P) => void,
+  ) {
+    const unsubscribe = (channels: string[]) => () => {
+      return new Promise<string[]>((resolve, reject) => {
+        if (this.timeout > 0) {
+          this.socket
+            .timeout(this.timeout)
+            .emit(
+              "/unsubscribe",
+              channels,
+              (error: Error, channels: string[]) => {
+                if (error) {
+                  reject(error);
+                } else {
+                  this.server.unsubscribed(channels, listener);
+                  resolve(channels);
+                }
+              },
+            );
+        } else {
+          this.socket.emit("/unsubscribe", channels, (channels: string[]) => {
+            this.server.unsubscribed(channels, listener);
+            resolve(channels);
+          });
+        }
+      });
+    };
+
+    return new Promise<() => Promise<string[]>>((resolve, reject) => {
+      if (this.timeout > 0) {
+        this.socket
+          .timeout(this.timeout)
+          .emit("/subscribe", channels, (error: Error, channels: string[]) => {
+            if (error) {
+              reject(error);
+            } else {
+              this.server.subscribed(channels, listener);
+              resolve(unsubscribe(channels));
+            }
+          });
+      } else {
+        this.socket.emit("/subscribe", channels, (channels: string[]) => {
+          this.server.subscribed(channels, listener);
+          resolve(unsubscribe(channels));
+        });
+      }
+    });
+  }
+
   apply<T, M extends string, P extends Array<unknown>>(method: M, args: P) {
     const rpc = createNanoRPC(method, args);
 
