@@ -27,8 +27,7 @@ export enum NanoRPCCode {
   Exception,
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const isPromise = <T>(value: any): value is Promise<T> =>
+const isPromise = <T>(value: T | Promise<T>): value is Promise<T> =>
   typeof value === "object" && value instanceof Promise;
 
 export class NanoRPCServer {
