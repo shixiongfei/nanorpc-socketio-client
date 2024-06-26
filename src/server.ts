@@ -75,7 +75,7 @@ export class NanoRPCServer {
 
     this.socket.on(
       `/nanorpcs/${method as string}`,
-      async (rpc: NanoRPC<string, unknown[]>, resp) => {
+      async (rpc: NanoRPC<unknown[]>, resp) => {
         if (typeof resp !== "function") {
           return;
         }
