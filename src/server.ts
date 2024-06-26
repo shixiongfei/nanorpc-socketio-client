@@ -65,8 +65,8 @@ export class NanoRPCServer {
     });
   }
 
-  on<T, M extends string, P extends Array<unknown>>(
-    method: M,
+  on<T, P extends Array<unknown>>(
+    method: string,
     func: (...args: P) => T | Promise<T>,
   ) {
     if (method in this.methods) {
