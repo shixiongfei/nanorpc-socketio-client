@@ -24,7 +24,8 @@ export type NanoClientOptions = Readonly<{
   secret?: string;
   queued?: boolean;
   timeout?: number;
-  auth?: object | ((cb: (data: object) => void) => void);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  auth?: { [key: string]: any } | ((cb: (data: object) => void) => void);
 }>;
 
 export class NanoRPCClient {
