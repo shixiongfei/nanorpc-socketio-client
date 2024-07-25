@@ -26,6 +26,10 @@ export type NanoClientOptions = Readonly<{
   timeout?: number;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   auth?: { [key: string]: any } | ((cb: (data: object) => void) => void);
+
+  onConnect?: () => void;
+  onConnectError?: (error: Error) => void;
+  onDisconnect?: (reason: string) => void;
 }>;
 
 export class NanoRPCClient {
@@ -45,6 +49,18 @@ export class NanoRPCClient {
     });
     this.message = new NanoRPCMessage(this.socket);
     this.server = new NanoRPCServer(this.socket, options);
+
+    if (options?.onConnect) {
+      this.socket.on("connect", options.onConnect);
+    }
+
+    if (options?.onConnectError) {
+      this.socket.on("connect_error", options.onConnectError);
+    }
+
+    if (options?.onDisconnect) {
+      this.socket.on("disconnect", options.onDisconnect);
+    }
   }
 
   get methods() {

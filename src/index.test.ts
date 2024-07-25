@@ -16,6 +16,18 @@ type AddRPCFunc = (a: number, b: number) => Promise<number | undefined>;
 const test = async () => {
   const rpc = createNanoRPCClient("ws://127.0.0.1:4000", {
     secret: "2f278d5f-2b90-4230-8cec-10f70f3feb06",
+
+    onConnect: () => {
+      console.log("Connected");
+    },
+
+    onConnectError: (error) => {
+      console.error(error);
+    },
+
+    onDisconnect: (reason) => {
+      console.log(`Disconnected (${reason})`);
+    },
   });
 
   rpc.methods.on("ping", (timestamp: number) => timestamp);
