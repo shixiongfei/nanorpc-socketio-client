@@ -13,19 +13,13 @@ import { Mutex } from "async-mutex";
 import { io } from "socket.io-client";
 import {
   NanoRPC,
+  NanoRPCError,
   NanoValidator,
+  createNanoRPCError,
   createNanoReply,
   createNanoValidator,
 } from "nanorpc-validator";
-import { NanoClientOptions } from "./index.js";
-
-export enum NanoRPCCode {
-  OK = 0,
-  ProtocolError,
-  MissingMethod,
-  ParameterError,
-  Exception,
-}
+import { NanoClientOptions, NanoRPCErrCode, NanoRPCStatus } from "./index.js";
 
 const isPromise = <T>(value: T | Promise<T>): value is Promise<T> =>
   typeof value === "object" && value instanceof Promise;
@@ -70,7 +64,10 @@ export class NanoRPCServer {
     func: (...args: P) => T | Promise<T>,
   ) {
     if (method in this.methods) {
-      throw new Error(`${method} method already registered`);
+      throw new NanoRPCError(
+        NanoRPCErrCode.DuplicateMethod,
+        `${method} method already registered`,
+      );
     }
 
     this.socket.on(
@@ -81,18 +78,20 @@ export class NanoRPCServer {
         }
 
         if (!rpc || !("method" in rpc) || typeof rpc.method !== "string") {
-          const reply = createNanoReply(
+          const reply = createNanoRPCError(
             rpc?.id ?? "",
-            NanoRPCCode.ProtocolError,
+            NanoRPCStatus.Exception,
+            NanoRPCErrCode.ProtocolError,
             "Protocol Error",
           );
           return resp(reply);
         }
 
         if (rpc.method !== method) {
-          const reply = createNanoReply(
+          const reply = createNanoRPCError(
             rpc?.id ?? "",
-            NanoRPCCode.MissingMethod,
+            NanoRPCStatus.Exception,
+            NanoRPCErrCode.MissingMethod,
             "Missing Method",
           );
           return resp(reply);
@@ -104,16 +103,24 @@ export class NanoRPCServer {
           const lines = validator.errors!.map(
             (err) => `${err.keyword}: ${err.instancePath}, ${err.message}`,
           );
-          const reply = createNanoReply(
+          const reply = createNanoRPCError(
             (rpc as { id?: string })?.id ?? "",
-            NanoRPCCode.ParameterError,
+            NanoRPCStatus.Exception,
+            NanoRPCErrCode.ParameterError,
             lines.join("\n"),
           );
           return resp(reply);
         }
 
         const doFunc = async () => {
-          const result = func(...(rpc.arguments as P));
+          const params = (
+            Array.isArray(rpc.params)
+              ? rpc.params
+              : rpc.params
+                ? [rpc.params]
+                : []
+          ) as P;
+          const result = func(...params);
           return isPromise(result) ? await result : result;
         };
 
@@ -122,20 +129,28 @@ export class NanoRPCServer {
             ? await this.mutex.runExclusive(doFunc)
             : await doFunc();
 
-          const reply = createNanoReply(rpc.id, 0, "OK", retval);
+          const reply = createNanoReply(rpc.id, NanoRPCStatus.OK, retval);
           return resp(reply);
         } catch (error) {
-          const message =
-            typeof error === "string"
-              ? error
-              : error instanceof Error
-                ? error.message
-                : `${error}`;
-          const reply = createNanoReply(
-            rpc?.id ?? "",
-            NanoRPCCode.Exception,
-            message,
-          );
+          const reply =
+            error instanceof NanoRPCError
+              ? createNanoRPCError(
+                  rpc?.id ?? "",
+                  NanoRPCStatus.Exception,
+                  error.code,
+                  error.message,
+                )
+              : createNanoRPCError(
+                  rpc?.id ?? "",
+                  NanoRPCStatus.Exception,
+                  NanoRPCErrCode.CallError,
+                  typeof error === "string"
+                    ? error
+                    : error instanceof Error
+                      ? error.message
+                      : `${error}`,
+                );
+
           return resp(reply);
         }
       },

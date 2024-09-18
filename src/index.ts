@@ -12,13 +12,30 @@
 import { io } from "socket.io-client";
 import { createParser } from "safety-socketio";
 import {
+  NanoRPCError,
   NanoReply,
   NanoValidator,
   createNanoRPC,
   createNanoValidator,
 } from "nanorpc-validator";
-import { NanoRPCCode, NanoRPCServer } from "./server.js";
+import { NanoRPCServer } from "./server.js";
 import { NanoRPCMessage } from "./message.js";
+
+export * from "nanorpc-validator";
+
+export enum NanoRPCStatus {
+  OK = 0,
+  Exception,
+}
+
+export enum NanoRPCErrCode {
+  DuplicateMethod = -1,
+  MethodNotFound = -2,
+  ProtocolError = -3,
+  MissingMethod = -4,
+  ParameterError = -5,
+  CallError = -6,
+}
 
 export type NanoClientOptions = Readonly<{
   secret?: string;
@@ -139,8 +156,8 @@ export class NanoRPCClient {
     });
   }
 
-  apply<T, P extends Array<unknown>>(method: string, args: P) {
-    const rpc = createNanoRPC(method, args);
+  apply<T, P extends object>(method: string, params?: P) {
+    const rpc = createNanoRPC(method, params);
 
     const parseReply = (reply: NanoReply<T>) => {
       const validator = this.validators.getValidator(method);
@@ -151,14 +168,20 @@ export class NanoRPCClient {
         );
         const error = lines.join("\n");
 
-        throw new Error(`NanoRPC call ${method}, ${error}`);
+        throw new NanoRPCError(
+          NanoRPCErrCode.CallError,
+          `Call ${method}, ${error}`,
+        );
       }
 
-      if (reply.code !== NanoRPCCode.OK) {
-        throw new Error(`NanoRPC call ${method} ${reply.message}`);
+      if (reply.status !== NanoRPCStatus.OK) {
+        throw new NanoRPCError(
+          reply.error?.code ?? NanoRPCErrCode.CallError,
+          `Call ${method} ${reply.error?.message ?? "unknown error"}`,
+        );
       }
 
-      return reply.value;
+      return reply.result;
     };
 
     return new Promise<T | undefined>((resolve, reject) => {
@@ -189,7 +212,7 @@ export class NanoRPCClient {
   }
 
   async call<T, P extends Array<unknown>>(method: string, ...args: P) {
-    return this.apply<T, P>(method, args);
+    return await this.apply<T, P>(method, args);
   }
 
   invoke<T, P extends Array<unknown>>(method: string) {
